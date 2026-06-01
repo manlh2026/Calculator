@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BTC DCA Calculator</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, 'Inter', sans-serif; background: #0f0f13; color: #e2e8f0; min-height: 100vh; padding: 24px 16px; }
+  .wrap { max-width: 580px; margin: 0 auto; }
+  h1 { font-size: 20px; font-weight: 700; color: #f7931a; }
+  .sub { font-size: 13px; color: #718096; margin: 4px 0 24px; }
+  .card { background: #1a1a24; border-radius: 12px; padding: 20px; margin-bottom: 16px; border: 1px solid #2d2d3d; }
+  .card-title { font-size: 14px; font-weight: 600; margin-bottom: 14px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  label { font-size: 11px; color: #718096; display: block; margin-bottom: 4px; }
+  input { width: 100%; background: #0f0f13; border: 1px solid #3d3d50; border-radius: 8px; padding: 9px 11px; color: #e2e8f0; font-size: 14px; outline: none; transition: border .2s; }
+  input:focus { border-color: #f7931a; }
+  .info-row { display: flex; justify-content: space-between; margin-top: 12px; padding: 9px 12px; background: #0f0f13; border-radius: 8px; font-size: 13px; color: #a0aec0; }
+  .orange { color: #f7931a; font-weight: 600; }
+  .green { color: #68d391; font-weight: 600; }
+  .red { color: #fc8181; }
+  .blue { color: #63b3ed; }
+  .zone-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; margin-bottom: 10px; align-items: end; }
+  .btn-del { background: #2d1a1a; border: none; border-radius: 8px; color: #fc8181; padding: 9px 13px; cursor: pointer; font-size: 16px; }
+  .btn-add { width: 100%; background: #1e2d1e; border: 1px dashed #48bb78; border-radius: 8px; color: #68d391; padding: 9px; cursor: pointer; font-size: 13px; margin-top: 4px; }
+  .pct-status { font-size: 12px; font-weight: 600; }
+  .result-box { background: #0f0f13; border-radius: 10px; padding: 16px; margin-top: 14px; }
+  .res-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; color: #718096; }
+  .res-row span:last-child { color: #e2e8f0; font-weight: 600; }
+  .res-big { display: flex; justify-content: space-between; padding-top: 10px; border-top: 1px solid #2d2d3d; margin-top: 4px; align-items: center; }
+  .res-big .lbl { font-size: 15px; font-weight: 600; color: #cbd5e0; }
+  .res-big .val { font-size: 22px; font-weight: 700; }
+  .badge { font-size: 12px; text-align: right; margin-top: 8px; }
+  .zone-result-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #2d2d3d; font-size: 13px; }
+  .zone-result-row:last-child { border-bottom: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>₿ BTC DCA Calculator</h1>
+  <p class="sub">Tính vùng gom theo mục tiêu giá trung bình</p>
+
+  <!-- Inputs cố định -->
+  <div class="card">
+    <div class="card-title">Thông số đầu vào</div>
+    <div class="grid2">
+      <div>
+        <label>Tổng vốn ($)</label>
+        <input type="number" id="totalCap" value="40000">
+      </div>
+      <div>
+        <label>Đã đầu tư ($)</label>
+        <input type="number" id="invested" value="5000">
+      </div>
+      <div>
+        <label>Giá mua lần đầu ($)</label>
+        <input type="number" id="price0" value="71000">
+      </div>
+      <div>
+        <label>Giá TB mục tiêu ($)</label>
+        <input type="number" id="targetAvg" value="55000">
+      </div>
+    </div>
+    <div class="info-row">
+      <span>Vốn còn lại: <span class="green" id="remaining">—</span></span>
+      <span>BTC đã có: <span class="orange" id="btc0">—</span></span>
+    </div>
+  </div>
+
+  <!-- Vùng gom -->
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+      <span class="card-title" style="margin:0">Vùng gom dự kiến</span>
+      <span class="pct-status" id="pctStatus"></span>
+    </div>
+    <div id="zones"></div>
+    <button class="btn-add" onclick="addZone()">+ Thêm vùng</button>
+  </div>
+
+  <!-- Kết quả -->
+  <div class="card" id="resultCard">
+    <div class="card-title">Kết quả dự phóng</div>
+    <div id="zoneResults"></div>
+    <div class="result-box">
+      <div class="res-row"><span>Tổng BTC tích lũy</span><span class="orange" id="rTotalBTC">—</span></div>
+      <div class="res-row"><span>Tổng vốn đã deploy</span><span id="rTotalUSD">—</span></div>
+      <div class="res-big">
+        <span class="lbl">Giá TB đạt được</span>
+        <span class="val" id="rAvg">—</span>
+      </div>
+      <div class="badge" id="rBadge"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+function fmt(n, d=0) { return Number(n).toLocaleString('en-US', {maximumFractionDigits: d}); }
+
+// State
+let zones = [
+  { price: 60000, pct: 30 },
+  { price: 55000, pct: 40 },
+  { price: 50000, pct: 30 },
+];
+
+function getInputs() {
+  return {
+    totalCap: parseFloat(document.getElementById('totalCap').value) || 0,
+    invested: parseFloat(document.getElementById('invested').value) || 0,
+    price0:   parseFloat(document.getElementById('price0').value) || 1,
+    targetAvg:parseFloat(document.getElementById('targetAvg').value) || 0,
+  };
+}
+
+function renderZones() {
+  const container = document.getElementById('zones');
+  // Lưu lại focus trước khi render
+  const focused = document.activeElement;
+  const focusedId = focused ? focused.id : null;
+  const focusedSel = focused ? focused.selectionStart : null;
+
+  container.innerHTML = '';
+  zones.forEach((z, i) => {
+    const row = document.createElement('div');
+    row.className = 'zone-row';
+    row.innerHTML = `
+      <div>
+        <label>Giá BTC ($)</label>
+        <input type="number" id="zp${i}" value="${z.price}" placeholder="vd: 60000">
+      </div>
+      <div>
+        <label>% vốn còn lại</label>
+        <input type="number" id="zc${i}" value="${z.pct}" placeholder="vd: 30">
+      </div>
+      <button class="btn-del" onclick="delZone(${i})">×</button>
+    `;
+    container.appendChild(row);
+
+    document.getElementById(`zp${i}`).addEventListener('input', function() {
+      zones[i].price = parseFloat(this.value) || 0;
+      calcResult();
+    });
+    document.getElementById(`zc${i}`).addEventListener('input', function() {
+      zones[i].pct = parseFloat(this.value) || 0;
+      calcResult();
+    });
+  });
+
+  // Khôi phục focus
+  if (focusedId) {
+    const el = document.getElementById(focusedId);
+    if (el) { el.focus(); if (focusedSel !== null) { try { el.setSelectionRange(focusedSel, focusedSel); } catch(e){} } }
+  }
+
+  calcResult();
+}
+
+function calcResult() {
+  const { totalCap, invested, price0, targetAvg } = getInputs();
+  const remaining = totalCap - invested;
+  const btc0 = invested / price0;
+
+  document.getElementById('remaining').textContent = '$' + fmt(remaining);
+  document.getElementById('btc0').textContent = btc0.toFixed(5) + ' BTC';
+
+  const totalPct = zones.reduce((s, z) => s + (z.pct || 0), 0);
+  const pctEl = document.getElementById('pctStatus');
+  pctEl.textContent = 'Tổng: ' + totalPct + '%';
+  pctEl.style.color = totalPct === 100 ? '#68d391' : '#fc8181';
+
+  let cumBTC = btc0, cumUSD = invested;
+  const zr = document.getElementById('zoneResults');
+  zr.innerHTML = '';
+
+  zones.forEach(z => {
+    const usd = (z.pct / 100) * remaining;
+    const btc = z.price > 0 ? usd / z.price : 0;
+    cumBTC += btc;
+    cumUSD += usd;
+
+    if (z.price > 0 && z.pct > 0) {
+      const div = document.createElement('div');
+      div.className = 'zone-result-row';
+      div.innerHTML = `
+        <span style="color:#a0aec0">Gom tại <span class="blue">$${fmt(z.price)}</span></span>
+        <span>$${fmt(usd)} → <span class="orange">${btc.toFixed(5)} BTC</span></span>
+      `;
+      zr.appendChild(div);
+    }
+  });
+
+  const avg = cumBTC > 0 ? cumUSD / cumBTC : 0;
+  document.getElementById('rTotalBTC').textContent = cumBTC.toFixed(5) + ' BTC';
+  document.getElementById('rTotalUSD').textContent = '$' + fmt(cumUSD);
+
+  const avgEl = document.getElementById('rAvg');
+  avgEl.textContent = avg ? '$' + fmt(avg) : '—';
+  const hit = targetAvg > 0 && avg > 0 && avg <= targetAvg * 1.03;
+  avgEl.style.color = hit ? '#68d391' : '#fc8181';
+
+  document.getElementById('rBadge').innerHTML = targetAvg > 0 && avg > 0
+    ? `<span style="color:${hit?'#68d391':'#fc8181'}">${hit ? '✅' : '⚠️'} Giá TB ~$${fmt(avg)} — Mục tiêu $${fmt(targetAvg)}</span>`
+    : '';
+}
+
+function addZone() {
+  zones.push({ price: 0, pct: 0 });
+  renderZones();
+}
+
+function delZone(i) {
+  zones.splice(i, 1);
+  renderZones();
+}
+
+// Bind inputs cố định — không re-render zones, chỉ tính lại
+['totalCap','invested','price0','targetAvg'].forEach(id => {
+  document.getElementById(id).addEventListener('input', calcResult);
+});
+
+renderZones();
+</script>
+</body>
+</html>
